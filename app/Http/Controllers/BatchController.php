@@ -1,0 +1,334 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\DataTables\BatchesDataTable;
+use App\Http\Requests\BatchRequest;
+use App\Models\Batch;
+use App\Models\Level;
+use App\Models\Sport;
+use App\Models\User;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+
+class BatchController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(BatchesDataTable $dataTable)
+    {
+        abort_if(! Auth::user()->can('batch_view'), 403);
+
+        try {
+            return $dataTable->render('batches.index');
+        } catch (Exception $e) {
+            Log::error('Batch Index Error: '.$e->getMessage());
+
+            return back()->with('error', 'Something went wrong.');
+        }
+    }
+
+    /**
+     * Show the form for creating the resource.
+     */
+    public function create()
+    {
+        abort_if(! Auth::user()->can('batch_create'), 403);
+
+        try {
+            $sports = Sport::where('status', 'active')->get();
+
+            $levels = Level::where('status', 'active')->get();
+
+            $coaches = User::role('coach')
+                ->where('status', 'active')
+                ->get();
+
+            $players = User::role('player')
+                ->where('status', 'active')
+                ->get();
+
+            return view(
+                'batches.addBatchesForm',
+                compact('sports', 'levels', 'coaches', 'players')
+            );
+
+        } catch (Exception $e) {
+            Log::error('Batch Create Form Error: '.$e->getMessage());
+
+            return back()->with('error', 'Something went wrong.');
+        }
+    }
+
+    /**
+     * Store batch.
+     */
+    public function store(BatchRequest $request)
+    {
+        abort_if(! Auth::user()->can('batch_create'), 403);
+
+        try {
+            $validated = $request->validated();
+
+            $validated['start_time'] = Carbon::parse($request->start_time)
+                ->format('H:i:s');
+
+            $validated['end_time'] = Carbon::parse($request->end_time)
+                ->format('H:i:s');
+
+            // Coach schedule overlap check
+            if ($request->has('coaches') && is_array($request->coaches)) {
+                $startTime = $validated['start_time'];
+                $endTime = $validated['end_time'];
+
+                foreach ($request->coaches as $coachId) {
+                    $overlappingBatch = Batch::where('status', 'active')
+                        ->where(function ($q) use ($startTime, $endTime) {
+                            $q->where('start_time', '<', $endTime)
+                              ->where('end_time', '>', $startTime);
+                        })
+                        ->whereHas('coaches', function ($q) use ($coachId) {
+                            $q->where('users.id', $coachId);
+                        })
+                        ->first();
+
+                    if ($overlappingBatch) {
+                        $coach = User::find($coachId);
+                        $coachName = $coach ? ($coach->firstname . ' ' . $coach->lastname) : 'Selected Coach';
+                        $startFormatted = Carbon::parse($overlappingBatch->start_time)->format('h:i A');
+                        $endFormatted = Carbon::parse($overlappingBatch->end_time)->format('h:i A');
+
+                        return response()->json([
+                            'message' => "Coach '{$coachName}' is already assigned to another batch ('{$overlappingBatch->name}') during this time ({$startFormatted} - {$endFormatted}).",
+                        ], 422);
+                    }
+                }
+            }
+
+            if ($request->players &&
+                count($request->players) > $request->capacity) {
+
+                return response()->json([
+                    'message' => 'Players limit exceeded.',
+                ], 422);
+            }
+
+            $batch = Batch::create($validated);
+
+            if ($request->has('coaches')) {
+                $batch->coaches()->attach($request->coaches);
+            }
+
+            if ($request->has('players')) {
+                foreach ($request->players as $playerId) {
+                    $batch->players()->attach($playerId, [
+                        'joined_at' => now(),
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Batch created successfully.',
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Batch Store Error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Edit batch.
+     */
+    public function edit(Batch $batch)
+    {
+        abort_if(! Auth::user()->can('batch_edit'), 403);
+
+        try {
+            $sports = Sport::where('status', 'active')->get();
+
+            $levels = Level::where('status', 'active')->get();
+
+            $coaches = User::role('coach')
+                ->where('status', 'active')
+                ->get();
+
+            $players = User::role('player')
+                ->where('status', 'active')
+                ->get();
+
+            return view(
+                'batches.editBatchesForm',
+                compact('batch', 'sports', 'levels', 'coaches', 'players')
+            );
+
+        } catch (Exception $e) {
+            Log::error('Batch Edit Error: '.$e->getMessage());
+
+            return back()->with('error', 'Something went wrong.');
+        }
+    }
+
+    /**
+     * Update batch.
+     */
+    public function update(BatchRequest $request, Batch $batch)
+    {
+        abort_if(! Auth::user()->can('batch_edit'), 403);
+
+        try {
+            $validated = $request->validated();
+
+            $validated['start_time'] = Carbon::parse($request->start_time)
+                ->format('H:i:s');
+
+            $validated['end_time'] = Carbon::parse($request->end_time)
+                ->format('H:i:s');
+
+            // Coach schedule overlap check
+            if ($request->has('coaches') && is_array($request->coaches)) {
+                $startTime = $validated['start_time'];
+                $endTime = $validated['end_time'];
+
+                foreach ($request->coaches as $coachId) {
+                    $overlappingBatch = Batch::where('status', 'active')
+                        ->where('id', '!=', $batch->id) // Exclude current batch being edited
+                        ->where(function ($q) use ($startTime, $endTime) {
+                            $q->where('start_time', '<', $endTime)
+                              ->where('end_time', '>', $startTime);
+                        })
+                        ->whereHas('coaches', function ($q) use ($coachId) {
+                            $q->where('users.id', $coachId);
+                        })
+                        ->first();
+
+                    if ($overlappingBatch) {
+                        $coach = User::find($coachId);
+                        $coachName = $coach ? ($coach->firstname . ' ' . $coach->lastname) : 'Selected Coach';
+                        $startFormatted = Carbon::parse($overlappingBatch->start_time)->format('h:i A');
+                        $endFormatted = Carbon::parse($overlappingBatch->end_time)->format('h:i A');
+
+                        return response()->json([
+                            'message' => "Coach '{$coachName}' is already assigned to another batch ('{$overlappingBatch->name}') during this time ({$startFormatted} - {$endFormatted}).",
+                        ], 422);
+                    }
+                }
+            }
+
+            if ($request->players &&
+                count($request->players) > $request->capacity) {
+                return response()->json([
+                    'message' => 'Players limit exceeded.',
+                ], 422);
+            }
+
+            $batch->update([
+                'name' => $validated['name'],
+                'capacity' => $validated['capacity'],
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'sport_id' => $validated['sport_id'],
+                'level_id' => $validated['level_id'],
+                'status' => $validated['status'],
+            ]);
+
+            $batch->coaches()->sync($request->coaches ?? []);
+
+            $syncPlayers = [];
+
+            if ($request->has('players')) {
+                foreach ($request->players as $playerId) {
+
+                    $existingPlayer = $batch->players()
+                        ->where('player_id', $playerId)
+                        ->first();
+
+                    if ($existingPlayer) {
+                        $syncPlayers[$playerId] = [
+                            'joined_at' => $existingPlayer->pivot->joined_at,
+                        ];
+                    } else {
+                        $syncPlayers[$playerId] = [
+                            'joined_at' => now(),
+                        ];
+                    }
+                }
+            }
+
+            $batch->players()->sync($syncPlayers);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Batch updated successfully.',
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Batch Update Error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete batch.
+     */
+    public function destroy(Batch $batch)
+    {
+        abort_if(! Auth::user()->can('batch_delete'), 403);
+
+        try {
+            $batch->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Batch deleted successfully.',
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Batch Delete Error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong.',
+            ], 500);
+        }
+    }
+
+    public function getSportLevels($id)
+    {
+        abort_if(! Auth::user()->can('batch_view'), 403);
+
+        try {
+            $sport = Sport::with('levels')->findOrFail($id);
+
+            return response()->json($sport->levels);
+
+        } catch (Exception $e) {
+            Log::error('Sport Levels Error: '.$e->getMessage());
+
+            return response()->json([], 500);
+        }
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        return handleBulkDelete($request, Batch::class, 'Batches', 'batch_delete');
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        return handleBulkUpdate($request, Batch::class, 'Batches', 'batch_edit');
+    }
+}
