@@ -10,6 +10,7 @@ use App\Http\Controllers\ImportExportController;
 use App\Http\Controllers\LevelsController;
 use App\Http\Controllers\PlayerController;
 use App\Http\Controllers\PlayerFeesController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SportLevelController;
@@ -95,6 +96,8 @@ Route::middleware('auth')->group(function () {
     Route::get('player-fees/{player_fee}/invoice', [PlayerFeesController::class, 'invoice'])
         ->name('player-fees.invoice');
     Route::resource('player-fees', PlayerFeesController::class);
+
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 
     Route::prefix('settings')->group(function () {
         Route::get('/', [SettingController::class, 'index'])->name('settings.index');

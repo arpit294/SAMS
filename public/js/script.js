@@ -345,23 +345,12 @@ $(document).ready(function () {
 
     // Refresh Table Filters Button click handler
     $(document).on('click', '#refreshTableBtn', function () {
-        var currentMonth = new Date().getMonth() + 1;
-        var currentYear = new Date().getFullYear();
         isResetting = true;
 
-        // Reset all Select2 values
-        $('#statusFilter').val('').trigger('change');
-        $('#roleFilter').val('').trigger('change');
-        $('#sportFilter').val('').trigger('change');
-        $('#levelFilter').val('').trigger('change');
-        $('#batchFilter').val('').trigger('change');
-        $('#monthFilter').val(currentMonth).trigger('change');
-        $('#yearFilter').val(currentYear).trigger('change');
-        $('#paymentTypeFilter').val('').trigger('change');
-
-        if ($('#playerFilter').length) {
-            $('#playerFilter').val(null).trigger('change');
-        }
+        $('#statusFilter, #roleFilter, #sportFilter, #levelFilter, #batchFilter, #monthFilter, #yearFilter, #paymentTypeFilter, #playerFilter').each(function () {
+            let preset = $(this).find('option[selected]').attr('value');
+            $(this).val(preset === undefined ? '' : preset).trigger('change');
+        });
 
         isResetting = false;
         $('#datatable').DataTable().ajax.reload();

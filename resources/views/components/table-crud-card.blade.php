@@ -189,15 +189,13 @@
                         </div>
                     @endforeach
 
+                    <button type="button"
+                        class="btn btn-light border shadow-sm rounded-3 px-3 d-flex align-items-center justify-content-center d-none"
+                        id="refreshTableBtn">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Reset
+                    </button>
+
                 </div>
-                <!-- Refresh -->
-                <button type="button"
-                    class="btn btn-light border shadow-sm rounded-3 px-3 d-flex align-items-center justify-content-center d-none"
-                    id="refreshTableBtn">
-
-                    <i class="bi bi-arrow-clockwise"></i>
-
-                </button>
 
             </div>
         @endif

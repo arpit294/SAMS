@@ -125,8 +125,8 @@ class DashboardController extends Controller
                 'total_fees_pending' => $total_fees_pending,
                 'total_monthly_fees_pending' => $total_monthly_fees_pending,
                 'recent_fees' => PlayerFee::with('player')->latest()->take(5)->get(),
-                'recent_players' => User::role($playerRole)->latest()->take(5)->get(),
-                'recent_batches' => Batch::with(['sport', 'level', 'coaches'])->latest()->take(5)->get(),
+                'recent_players' => User::role($playerRole)->with(['playerBatches.level', 'playerBatches.sport'])->latest()->take(5)->get(),
+                'recent_batches' => Batch::with(['sport', 'level', 'coaches'])->withCount('players')->latest()->take(5)->get(),
             ];
 
             // 2. Unpaid players list filters for this month

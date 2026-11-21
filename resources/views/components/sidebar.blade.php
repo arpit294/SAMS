@@ -162,6 +162,15 @@
             </li>
         @endcanany
 
+        @can('dashboard_view')
+            <li class="nav-item">
+                <a class="nav-link {{ request()->is('reports*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+                    <i class="bi bi-file-earmark-bar-graph nav-icon"></i>
+                    Reports
+                </a>
+            </li>
+        @endcan
+
         @can('setting_view')
             <li
                 class="nav-group {{ request()->is('settings*') || request()->is('role-permission*') || request()->is('import-export*') ? 'show' : '' }}">

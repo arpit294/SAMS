@@ -343,7 +343,12 @@
                                                     </div>
                                                 </td>
                                                 <td class="py-2.5 px-2 text-end text-secondary" style="font-size: 11px;">
-                                                    <i class="bi bi-clock me-1 text-primary"></i>{{ \Carbon\Carbon::parse($batch->start_time)->format('h:i A') }}
+                                                    <div class="fw-semibold text-dark">
+                                                        <i class="bi bi-people me-1 text-primary"></i>{{ $batch->players_count }} {{ \Illuminate\Support\Str::plural('student', $batch->players_count) }}
+                                                    </div>
+                                                    <div class="mt-1">
+                                                        <i class="bi bi-clock me-1 text-primary"></i>{{ \Carbon\Carbon::parse($batch->start_time)->format('h:i A') }}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @empty
@@ -381,9 +386,14 @@
                                                 <div class="text-secondary" style="font-size: 10px;">{{ $player->email ?? 'No email' }}</div>
                                             </div>
                                         </div>
-                                        <span class="badge bg-light text-secondary border border-secondary-subtle px-2 py-0.5 text-uppercase" style="font-size: 8.5px; font-weight: 600;">
-                                            {{ $player->gender ?? 'N/A' }}
-                                        </span>
+                                        <div class="text-end ms-2" style="font-size: 11px;">
+                                            @forelse($player->playerBatches as $batch)
+                                                <div class="fw-semibold text-dark">{{ $batch->name }}</div>
+                                                <div class="text-secondary" style="font-size: 10px;">{{ $batch->sport->name ?? 'No sport' }} ({{ $batch->level->name ?? 'No level' }})</div>
+                                            @empty
+                                                <div class="text-secondary">No batch</div>
+                                            @endforelse
+                                        </div>
                                     </li>
                                 @empty
                                     <li class="list-group-item text-center py-4 text-secondary bg-transparent">No recent players registered</li>
